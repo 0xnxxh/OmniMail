@@ -6,6 +6,7 @@ import { qqMailEndpoints } from './apiCatalogQqMail'
 import { naverMailEndpoints } from './apiCatalogNaverMail'
 import { yandexMailEndpoints } from './apiCatalogYandexMail'
 import { systemEndpoints, authEndpoints } from './apiCatalogPublic'
+import { desktopEndpoints } from './apiCatalogDesktop'
 import { localized, type ApiAuth, type ApiEndpoint, type ApiGroupId } from './apiCatalogTypes'
 
 export type { ApiAuth, ApiEndpoint, ApiGroupId, LocalizedText } from './apiCatalogTypes'
@@ -50,6 +51,7 @@ export const apiGroups: Array<{
 export const apiEndpoints: ApiEndpoint[] = [
   ...systemEndpoints,
   ...authEndpoints,
+  ...desktopEndpoints,
   ...mailboxEndpoints,
   ...messageEndpoints,
   ...draftEndpoints,

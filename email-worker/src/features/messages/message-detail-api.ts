@@ -1,4 +1,4 @@
-import { attachmentDisposition, inlineDisposition, safeJsonArray } from '../../shared/http/api-helpers'
+import { attachmentDisposition, inlineDisposition, safeJsonArray, validEmail } from '../../shared/http/api-helpers'
 import { writeAudit } from '../../shared/audit/audit'
 import { messageSummary } from './message-list-api'
 import { listMessageThread } from './message-thread'
@@ -49,6 +49,7 @@ export async function getMessageDetail(
       ...summary,
       messageId: message.message_id,
       inReplyTo: message.in_reply_to,
+      replyTo: safeJsonArray(message.reply_to_json).find(validEmail) || message.sender_address,
       references: message.references_header,
       cc: safeJsonArray(message.cc_json),
       text: body.text,
