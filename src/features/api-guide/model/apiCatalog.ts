@@ -7,6 +7,7 @@ import { naverMailEndpoints } from './apiCatalogNaverMail'
 import { yandexMailEndpoints } from './apiCatalogYandexMail'
 import { systemEndpoints, authEndpoints } from './apiCatalogPublic'
 import { desktopEndpoints } from './apiCatalogDesktop'
+import { credentialMigrationEndpoints } from './apiCatalogCredentialMigration'
 import { localized, type ApiAuth, type ApiEndpoint, type ApiGroupId } from './apiCatalogTypes'
 
 export type { ApiAuth, ApiEndpoint, ApiGroupId, LocalizedText } from './apiCatalogTypes'
@@ -52,6 +53,7 @@ export const apiEndpoints: ApiEndpoint[] = [
   ...systemEndpoints,
   ...authEndpoints,
   ...desktopEndpoints,
+  ...credentialMigrationEndpoints,
   ...mailboxEndpoints,
   ...messageEndpoints,
   ...draftEndpoints,

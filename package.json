@@ -12,23 +12,8 @@
       "SUPER_ADMIN_EMAIL": {
         "description": "Required email address of the super administrator, for example owner@example.com."
       },
-      "ICLOUD_CREDENTIALS_KEY": {
-        "description": "Optional. At least 32 random UTF-8 bytes for encrypting iCloud cookies and app-specific passwords."
-      },
-      "LINUX_DO_MAIL_CREDENTIALS_KEY": {
-        "description": "Optional. At least 32 random UTF-8 bytes for encrypting Linux DO Mail passwords or authentication tokens."
-      },
-      "GMAIL_CREDENTIALS_KEY": {
-        "description": "Optional. At least 32 random UTF-8 bytes for encrypting Gmail app passwords."
-      },
-      "QQ_MAIL_CREDENTIALS_KEY": {
-        "description": "Optional. At least 32 random UTF-8 bytes for encrypting QQ Mail authorization codes."
-      },
-      "NAVER_MAIL_CREDENTIALS_KEY": {
-        "description": "Optional. At least 32 random UTF-8 bytes for encrypting NAVER Mail app-specific passwords."
-      },
-      "MICROSOFT_CREDENTIALS_KEY": {
-        "description": "Optional. At least 32 random UTF-8 bytes for encrypting Microsoft OAuth tokens and optional combination passwords."
+      "MAIL_CREDENTIALS_KEY": {
+        "description": "Optional. At least 32 random UTF-8 bytes. One key encrypts credentials for all external mail providers. Existing provider-specific secrets remain supported; retain them until migration completes."
       }
     }
   },

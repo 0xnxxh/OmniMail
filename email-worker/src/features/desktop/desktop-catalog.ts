@@ -1,4 +1,5 @@
 import type { Env, SessionUser } from '../../app/types'
+import { mailCredentialsReady } from '../../shared/security/mail-credentials'
 
 export interface DesktopAccount {
   id: string
@@ -100,7 +101,7 @@ export async function desktopCatalog(env: Env, user: SessionUser): Promise<Deskt
     for (const row of results) {
       const keyReady =
         !('key' in source) ||
-        new TextEncoder().encode(env[source.key]?.trim() || '').byteLength >= 32
+        mailCredentialsReady(env, source.key)
       const ready = Boolean(row.available) && keyReady
       const email =
         source.provider === 'linuxdo' && !row.email.includes('@')
