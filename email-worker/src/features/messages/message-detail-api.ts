@@ -94,19 +94,23 @@ export async function updateMessage(
     : 0
   const trashedAt = movingToTrash ? message.trashed_at ?? now : null
   const purgeAfter = movingToTrash ? trashedAt! + trashDays * 24 * 60 * 60 : null
+  const isRead = typeof body.isRead === 'boolean' ? Number(body.isRead) : message.is_read
+  const isStarred = typeof body.isStarred === 'boolean' ? Number(body.isStarred) : message.is_starred
 
   await env.DB.prepare(
     `UPDATE messages
         SET is_read = ?, is_starred = ?, folder = ?,
             trashed_at = ?, purge_after = ?, updated_at = unixepoch()
-      WHERE id = ?`,
+      WHERE id = ? AND (is_read IS NOT ? OR is_starred IS NOT ? OR folder IS NOT ?
+        OR trashed_at IS NOT ? OR purge_after IS NOT ?)`,
   ).bind(
-    typeof body.isRead === 'boolean' ? Number(body.isRead) : message.is_read,
-    typeof body.isStarred === 'boolean' ? Number(body.isStarred) : message.is_starred,
+    isRead,
+    isStarred,
     allowedFolder,
     trashedAt,
     purgeAfter,
     message.id,
+    isRead, isStarred, allowedFolder, trashedAt, purgeAfter,
   ).run()
   return Response.json({ ok: true })
 }

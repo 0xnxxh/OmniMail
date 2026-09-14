@@ -105,8 +105,9 @@ function recordMigration(db: D1Database, migration: string): D1PreparedStatement
 async function ensureRequiredMigrations(db: D1Database): Promise<void> {
   try {
     if (await appliedMigration(db, REQUIRED_MIGRATION)) return
-  } catch {
-    // A fresh database has no migration table yet; continue into recovery.
+  } catch (error) {
+    // 只有明确缺少迁移表才进入恢复；额度、权限和网络错误不能误当成需要建表。
+    if (!(error instanceof Error) || !/no such table:\s*d1_migrations\b/i.test(error.message)) throw error
   }
   await bootstrapLegacyMigrations(db)
   for (const migration of RECOVERABLE_MIGRATIONS) {
