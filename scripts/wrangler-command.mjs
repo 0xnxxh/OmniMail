@@ -46,7 +46,7 @@ export class WranglerCommandError extends Error {
   }
 }
 
-export function runWrangler(args, { capture = false, env = process.env } = {}) {
+export function runWrangler(args, { capture = false, env = process.env, sensitive = false } = {}) {
   const result = spawnSync(process.execPath, [wranglerCli, ...args], {
     cwd: root,
     encoding: 'utf8',
@@ -56,8 +56,11 @@ export function runWrangler(args, { capture = false, env = process.env } = {}) {
     timeout: 10 * 60 * 1000,
   })
   // --json 的错误可能只写入 stdout；只检查 stderr 会丢失首次部署的真正原因。
-  if (result.error || result.status !== 0) throw new WranglerCommandError(result, env)
-  if (!capture) {
+  if (result.error || result.status !== 0) {
+    if (sensitive) throw new Error('Wrangler 认证命令失败，请检查登录配置。')
+    throw new WranglerCommandError(result, env)
+  }
+  if (!capture && !sensitive) {
     if (result.stdout) process.stdout.write(redactOutput(result.stdout, env))
     if (result.stderr) process.stderr.write(redactOutput(result.stderr, env))
   }

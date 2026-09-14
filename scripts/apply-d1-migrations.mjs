@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { needsLegacyBootstrap, pendingMigrationNames } from './migration-plan.mjs'
 import { isMainModule, reportFailure, root, runWrangler, withRetry } from './wrangler-command.mjs'
+import { cloudflareReader, resolveDeploymentTarget, targetArguments, writeDeploymentTarget } from './deployment-target.mjs'
 
 export function migrationNames() {
   return readdirSync(join(root, 'migrations'))
@@ -95,6 +96,15 @@ export async function applyD1Migrations({
 if (isMainModule(import.meta.url)) {
   if (process.argv.length !== 3) {
     reportFailure(new Error('用法：node scripts/apply-d1-migrations.mjs --remote|--local'))
+  } else if (process.argv[2] === '--remote') {
+    await (async () => {
+      const get = await cloudflareReader({})
+      const target = await resolveDeploymentTarget({}, { get })
+      if (!target.databaseId) throw new Error('请先运行 npm run deploy 创建并绑定 D1。')
+      const file = writeDeploymentTarget(target)
+      try { await applyD1Migrations({ configArgs: targetArguments({}, file.path) }) }
+      finally { file.dispose() }
+    })().catch(reportFailure)
   } else {
     await applyD1Migrations({ mode: process.argv[2] }).catch(reportFailure)
   }

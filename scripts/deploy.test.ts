@@ -2,83 +2,108 @@ import { describe, expect, it, vi } from 'vitest'
 import { deploy, deploymentOptions } from './deploy.mjs'
 import { withRetry } from './wrangler-command.mjs'
 
-const missingDatabase = new Error("Couldn't find an auto-provisioned D1 DB named 'omni-mail-db' for binding 'DB'. Run 'wrangler deploy' to provision it.")
-const retry = (operation: () => Promise<void>, options: object) => withRetry(operation, {
+const retry = (operation: () => Promise<unknown>, options: object) => withRetry(operation, {
   ...options, sleep: vi.fn(), warn: vi.fn(), random: () => 0,
 })
+const target = { workerName: 'omni-mail', workerExists: true, databaseId: 'bound-id' }
+function dependencies() {
+  const dispose = vi.fn()
+  return {
+    retry, makeReader: vi.fn(async () => vi.fn()), resolveTarget: vi.fn(async () => target),
+    writeTarget: vi.fn(() => ({ path: 'resolved.json', dispose })), dispose,
+  }
+}
 
 describe('部署入口', () => {
-  it('已有数据库先迁移再发布', async () => {
+  it('已有 Worker 先解析实际绑定，再迁移和发布同一目标', async () => {
     const events: string[] = []
-    await deploy([], {
-      migrate: async () => { events.push('migrate') },
-      run: async () => { events.push('deploy') }, retry,
-    })
+    const deps = dependencies()
+    const migrate = vi.fn(async () => { events.push('migrate') })
+    const run = vi.fn(async () => { events.push('deploy') })
+    await deploy([], { ...deps, migrate, run })
     expect(events).toEqual(['migrate', 'deploy'])
+    expect(migrate).toHaveBeenCalledWith({ configArgs: ['--config', 'resolved.json'] })
+    expect(run).toHaveBeenCalledWith(['deploy', '--config', 'resolved.json'])
+    expect(deps.dispose).toHaveBeenCalledOnce()
   })
 
-  it('首次部署先创建绑定，等待资源可用后完成迁移', async () => {
+  it('首次部署后重新解析实际 ID，等待绑定可用再初始化', async () => {
     const events: string[] = []
-    let calls = 0
-    await deploy([], {
-      migrate: async () => {
-        events.push('migrate')
-        if (calls++ < 2) throw missingDatabase
-      },
-      run: async () => { events.push('deploy') }, retry,
+    const deps = dependencies()
+    deps.resolveTarget.mockResolvedValueOnce({ ...target, workerExists: false, databaseId: undefined })
+      .mockResolvedValueOnce({ ...target, workerExists: false, databaseId: undefined })
+      .mockResolvedValue(target)
+    await deploy([], { ...deps,
+      migrate: async () => { events.push('migrate') }, run: async () => { events.push('deploy') },
     })
-    expect(events).toEqual(['migrate', 'deploy', 'migrate', 'migrate'])
+    expect(events).toEqual(['deploy', 'migrate'])
+    expect(deps.resolveTarget).toHaveBeenCalledTimes(3)
+    expect(deps.dispose).toHaveBeenCalledTimes(2)
   })
 
-  it.each(['Authentication error', 'SQLITE_ERROR', "Couldn't find a D1 DB named 'configured-db'"])(
-    '迁移遇到 %s 时停止发布', async (message) => {
+  it.each(['Authentication error', 'SQLITE_ERROR', "Couldn't find an auto-provisioned D1 DB named 'omni-mail-db' for binding 'DB'"])(
+    '迁移遇到 %s 时不尝试新建或发布替代数据库', async (message) => {
+      const deps = dependencies()
       const run = vi.fn()
-      await expect(deploy([], {
-        migrate: vi.fn().mockRejectedValue(new Error(message)), run, retry,
-      })).rejects.toThrow(message)
+      await expect(deploy([], { ...deps, migrate: vi.fn().mockRejectedValue(new Error(message)), run })).rejects.toThrow(message)
       expect(run).not.toHaveBeenCalled()
+      expect(deps.dispose).toHaveBeenCalledOnce()
     },
   )
 
-  it('首次发布后初始化失败，明确报告尚未完成并返回失败', async () => {
-    const migrate = vi.fn().mockRejectedValueOnce(missingDatabase)
-      .mockRejectedValue(new Error('Forbidden HTTP 403'))
-    const run = vi.fn()
-    await expect(deploy([], { migrate, run, retry })).rejects.toThrow('Worker 已发布，但 D1 初始化未完成')
-    expect(run).toHaveBeenCalledOnce()
+  it('绑定缺失或权限拒绝时在任何写入前停止', async () => {
+    const deps = dependencies()
+    deps.resolveTarget.mockRejectedValue(new Error('线上绑定不可用'))
+    const run = vi.fn(), migrate = vi.fn()
+    await expect(deploy([], { ...deps, run, migrate })).rejects.toThrow('线上绑定不可用')
+    expect(migrate).not.toHaveBeenCalled()
+    expect(run).not.toHaveBeenCalled()
+    expect(deps.writeTarget).not.toHaveBeenCalled()
   })
 
-  it('上传遇到网络故障时重试，不重复迁移', async () => {
+  it('首次发布后初始化失败，明确报告未完成并清理临时配置', async () => {
+    const deps = dependencies()
+    deps.resolveTarget.mockResolvedValueOnce({ ...target, workerExists: false, databaseId: undefined })
+    const run = vi.fn()
+    await expect(deploy([], { ...deps, run, migrate: vi.fn().mockRejectedValue(new Error('Forbidden HTTP 403')) }))
+      .rejects.toThrow('Worker 已发布，但 D1 初始化未完成')
+    expect(run).toHaveBeenCalledOnce()
+    expect(deps.dispose).toHaveBeenCalledTimes(2)
+  })
+
+  it('上传临时失败时重试同一目标，不重复迁移', async () => {
+    const deps = dependencies()
     const run = vi.fn().mockRejectedValueOnce(new Error('HTTP 503')).mockResolvedValue('ok')
     const migrate = vi.fn()
-    await deploy([], { run, migrate, retry })
+    await deploy([], { ...deps, run, migrate })
     expect(run).toHaveBeenCalledTimes(2)
     expect(migrate).toHaveBeenCalledOnce()
   })
 
-  it('dry-run 完全跳过远程迁移和资源初始化', async () => {
-    const run = vi.fn()
-    const migrate = vi.fn()
-    await deploy(['--dry-run', '--outdir', '.wrangler/preview'], { run, migrate, retry })
+  it('dry-run 不读取远端、不初始化、不迁移', async () => {
+    const deps = dependencies()
+    const run = vi.fn(), migrate = vi.fn()
+    await deploy(['--dry-run', '--outdir', '.wrangler/preview'], { ...deps, run, migrate })
+    expect(deps.makeReader).not.toHaveBeenCalled()
     expect(migrate).not.toHaveBeenCalled()
     expect(run).toHaveBeenCalledExactlyOnceWith(['deploy', '--dry-run', '--outdir', '.wrangler/preview'])
   })
 
-  it('配置、环境与认证参数传给同一次部署的迁移操作', async () => {
-    const args = ['--env', 'staging', '--config', 'staging.jsonc', '--env-file', '.env.staging', '--profile', 'test']
-    const migrate = vi.fn()
-    const run = vi.fn()
-    await deploy(args, { migrate, run, retry })
-    expect(migrate).toHaveBeenCalledWith({ configArgs: args })
-    expect(run).toHaveBeenCalledWith(['deploy', ...args])
+  it('保留环境和登录配置，但迁移、发布都使用解析后的配置路径', async () => {
+    const deps = dependencies()
+    const args = ['--env', 'staging', '--config', 'staging.jsonc', '--env-file', '.env.staging', '--profile', 'test', '--minify']
+    const migrate = vi.fn(), run = vi.fn()
+    await deploy(args, { ...deps, migrate, run })
+    const common = ['--config', 'resolved.json', '--env', 'staging', '--env-file', '.env.staging', '--profile', 'test']
+    expect(migrate).toHaveBeenCalledWith({ configArgs: common })
+    expect(run).toHaveBeenCalledWith(['deploy', ...common, '--minify'])
   })
 
-  it('未知目标覆盖或无效参数在任何远端操作前报错', async () => {
+  it('未知目标覆盖或无效参数在任何操作前报错', async () => {
     expect(() => deploymentOptions(['--env', '\n'])).toThrow('无效')
-    const run = vi.fn()
-    const migrate = vi.fn()
-    await expect(deploy(['--name', 'other-worker'], { run, migrate, retry })).rejects.toThrow()
+    const deps = dependencies(), run = vi.fn(), migrate = vi.fn()
+    await expect(deploy(['--name', 'other-worker'], { ...deps, run, migrate })).rejects.toThrow()
+    expect(deps.makeReader).not.toHaveBeenCalled()
     expect(run).not.toHaveBeenCalled()
-    expect(migrate).not.toHaveBeenCalled()
   })
 })

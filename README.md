@@ -384,9 +384,10 @@ Import a repository**，选择你的 OmniMail 仓库：
 [`wrangler.jsonc`](./wrangler.jsonc) 完成两件事：
 
 1. `npm run build` 将 React 前端生成到 `dist/`。
-2. `npm run deploy` 检查并应用尚未执行的 D1 迁移，再由 Wrangler 将 `dist/`、Worker
-   API、D1、R2、Queue、Workflow 和定时任务作为同一个 Worker 版本发布。如果首次部署
-   的 D1 尚未创建，则先发布 Worker 以自动创建并绑定资源，再初始化数据库并校验迁移记录。
+2. `npm run deploy` 先读取目标 Worker 的实际 `DB` 绑定 ID，检查并应用尚未执行的 D1
+   迁移，再由 Wrangler 将 `dist/`、Worker API、资源和定时任务作为同一个 Worker 版本发布。
+   首次自动创建的 D1 数据库统一命名为 `omni-mail-db`；先创建并绑定资源，再按实际 ID
+   初始化数据库并校验迁移记录。已有用户的数据库名称及数据保持原样。
    在此首次初始化完成前，API 可能短暂提示数据库迁移未完成。
 
 部署命令请使用 **`npm run deploy`**。单独运行 `npx wrangler deploy` 只发布 Worker，
@@ -398,6 +399,23 @@ Import a repository**，选择你的 OmniMail 仓库：
 SQL；远端已经成功但响应丢失时，不会重复执行已记录的迁移。权限、配置或 SQL 错误会
 显示具体原因并停止；例如构建 API Token 需要具备相应账户的 **D1 编辑权限**。
 首次资源创建成功但迁移失败时，修复原因后重新运行同一命令可继续完成部署。
+
+#### D1 名称与绑定兼容
+
+Worker 默认名称是 `omni-mail`，代码中的 D1 绑定名始终是 `DB`。首次自动创建数据库使用
+`omni-mail-db`；已有用户的库即使叫 `omnimail-db` 或其他名称，也会按线上 `DB` 实际绑定的
+数据库 ID 迁移和部署，不要求改名。`npm run db:migrate` 的远程迁移同样先解析实际绑定。
+
+部署脚本会识别 Workers Builds 的实际 Worker 名称覆盖，保留 `--env`、`--config`、
+`--env-file` 和 `--profile`，在源配置旁生成本次使用的临时配置；两步共用同一个数据库 ID，
+结束后删除临时文件，不改写仓库的 `wrangler.jsonc`。
+
+已有 Worker 缺少 `DB`、显式 `database_id` 与线上绑定冲突、无法唯一确定账户或权限不足时，
+脚本会停止并提示核对。首次部署遇到已有同名 `omni-mail-db` 时也不会擅自复用；如确实要
+使用它，请核对数据后在自己的配置中填写该库的 `database_id`。无需删除或重建原数据库。
+
+构建凭据需可读取目标 Worker 绑定，并具备目标账户的 D1 编辑权限。无法确定账户时设置
+`CLOUDFLARE_ACCOUNT_ID`；账户 ID 和 Worker 名称等部署目标变量使用明确值，不使用环境插值。
 
 `npm run deploy -- --dry-run` 只做打包预检，不执行远程数据库迁移或创建资源。
 使用命名环境时，`npm run deploy -- --env staging` 会将环境同时传给迁移和发布步骤。
