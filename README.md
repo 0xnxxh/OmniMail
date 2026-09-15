@@ -60,8 +60,8 @@
 - **稳定兼容基线**：Web/API 与 Float 的 `1.x` 会保持已公布来源 ID、账号状态、能力字段、
   工作区路径和通知深链接向后兼容；破坏性变更必须进入新的主版本并提供迁移说明。
 - **可选邮箱集成**：iCloud、Linux DO、Gmail、Microsoft、QQ、NAVER 与 Yandex 依赖
-  第三方服务能力和实例配置。NAVER、Yandex 仍按灰度流程开放，稳定版本号不取消真实账号
-  验收、低频观察或紧急关闭开关。
+  第三方服务能力和实例配置。NAVER、Yandex 配置有效邮箱密钥后自动可用，入口默认显示，
+  由系统设置控制隐藏；接入后仍建议完成真实账号验证与低频观察。
 - **独立预览版**：Android `0.x` 可用于测试和日常验证，但不继承 Web/Float `1.x` 的完整
   稳定契约；升级前应阅读对应 Android Release Notes。
 
@@ -205,7 +205,7 @@ Serverless Webmail：
 
 部署和真实账号验收步骤见 [QQ 邮箱设置指南](docs/QQ_MAIL_SETUP.md)。
 
-### NAVER 邮箱（灰度、只读）
+### NAVER 邮箱（只读）
 
 - 仅支持个人 `@naver.com` 邮箱；用户需先开启 NAVER 两步验证和 IMAP/SMTP，并生成独立的
   应用专用密码。OmniMail 固定连接 `imap.naver.com:993`，不接受登录主密码或自定义服务器。
@@ -213,11 +213,11 @@ Serverless Webmail：
   正文与最大 5 MiB 附件按需读取且不持久化。
 - 打开正文后仅尝试精确写入 `\\Seen`；不支持发信、删除、移动、归档、星标或文件夹管理。
 - 应用专用密码由 `MAIL_CREDENTIALS_KEY`（或兼容的 `NAVER_MAIL_CREDENTIALS_KEY`）使用 AES-GCM 加密，API 只返回
-  `hasAppPassword: true`。入口默认隐藏，生产开放前必须完成真实 Worker 登录和 24 小时稳定性观察。
+  `hasAppPassword: true`。密钥有效即自动启用，入口默认显示，可在系统设置中隐藏。
 
-部署、灰度闸门和真实账号验收步骤见 [NAVER Mail 设置指南](docs/NAVER_MAIL_SETUP.md)。
+部署和真实账号验证步骤见 [NAVER Mail 设置指南](docs/NAVER_MAIL_SETUP.md)。
 
-### Yandex 邮箱（灰度、只读）
+### Yandex 邮箱（只读）
 
 - 首版仅支持个人 `@yandex.com` 邮箱，使用 Yandex ID 中为“邮件”创建的应用密码。
 - OmniMail 固定连接 `imap.yandex.com:993`；登录名从邮箱本地部分派生，不接受主密码、自定义
@@ -225,9 +225,9 @@ Serverless Webmail：
 - 首次索引最近 100 封、每账号最多保留 500 封 INBOX 元数据，默认每 15 分钟加入同步 Queue；
   正文与最大 5 MiB 附件按需读取且不持久化。
 - 打开正文后仅尝试精确写入 `\Seen`；不支持发信、删除、移动、归档、星标或文件夹管理。
-- 应用密码由 `MAIL_CREDENTIALS_KEY`（或兼容的 `YANDEX_MAIL_CREDENTIALS_KEY`）使用 AES-GCM 加密；入口和部署开关默认关闭。
+- 应用密码由 `MAIL_CREDENTIALS_KEY`（或兼容的 `YANDEX_MAIL_CREDENTIALS_KEY`）使用 AES-GCM 加密；密钥有效即自动启用，入口默认显示，可在系统设置中隐藏。
 
-部署和灰度验收步骤见 [Yandex Mail 设置指南](docs/YANDEX_MAIL_SETUP.md)。
+部署和真实账号验证步骤见 [Yandex Mail 设置指南](docs/YANDEX_MAIL_SETUP.md)。
 
 ### 多域名与用户
 
@@ -505,7 +505,6 @@ Worker 文件，剩余路径仍会匹配 `*` 并正常部署。Build watch paths
 | `QQ_MAIL_CREDENTIALS_KEY` | Secret | 至少 32 字节，只用于加密 QQ 邮箱授权码；不使用该功能时可留空 |
 | `QQ_MAIL_IMAP_ENABLED` | Text | 可选紧急功能开关；设为 `false` 时隐藏并停止 QQ 邮箱接入，默认启用 |
 | `NAVER_MAIL_CREDENTIALS_KEY` | Secret | 至少 32 字节，只用于加密 NAVER 应用专用密码；不使用该功能时可留空 |
-| `NAVER_MAIL_IMAP_ENABLED` | Text | NAVER 功能开关；仅设为 `true` 时启用，完成真实账号验收前保持 `false` |
 | `MICROSOFT_CREDENTIALS_KEY` | Secret | 至少 32 字节，用于加密 Microsoft OAuth token 与可选组合 password；不使用该功能时可留空 |
 | `MICROSOFT_MAIL_ENABLED` | Text | 可选紧急功能开关；设为 `false` 时隐藏并停止 Microsoft 接入，默认启用 |
 | `CLOUDFLARE_ACCOUNT_ID` | Text | 可选备份所需的 Cloudflare Account ID |
@@ -647,17 +646,16 @@ Worker 只访问 Microsoft 官方 OAuth 与 IMAP 端点；批量导入文本会�
 QQ 收件箱下的英文、Foxmail 或 VIP 地址，服务端会先验证 QQ SMTP 登录且不会发送测试邮件。
 管理员可在 **系统设置 → 邮箱功能入口** 中隐藏入口；隐藏不会删除账号、密文或索引。
 
-若要灰度启用独立的 **NAVER 邮箱聚合收件箱**，配置至少 32 字节的
-`MAIL_CREDENTIALS_KEY` 并应用 `0033_naver_mail_imap.sql`。完成实际生产 Worker 登录和
-至少 24 小时低频稳定性观察前，保持 `NAVER_MAIL_IMAP_ENABLED=false`；验收通过后设为 `true`，
-再由管理员从 **系统设置 → 邮箱功能入口** 显式开放 NAVER 入口。用户只能连接个人
-`@naver.com` 邮箱，且必须使用 NAVER 应用专用密码。
+独立的 **NAVER 邮箱聚合收件箱** 在配置至少 32 字节的 `MAIL_CREDENTIALS_KEY` 并应用
+`0033_naver_mail_imap.sql` 后自动可用，无需额外的 IMAP 环境开关。入口默认显示，管理员可从
+**系统设置 → 邮箱功能入口** 隐藏。用户只能连接个人 `@naver.com` 邮箱，且必须使用 NAVER 应用专用密码。
 
-若要灰度启用独立的 **Yandex 邮箱聚合收件箱**，配置至少 32 字节的
-`MAIL_CREDENTIALS_KEY` 并应用 `0034_yandex_mail_imap.sql`。先保持
-`YANDEX_MAIL_IMAP_ENABLED=false` 完成实际 Worker 验证和至少 24 小时低频稳定性观察；验收后
-设为 `true`，再由管理员从 **系统设置 → 邮箱功能入口** 显式开放入口。首版仅接受个人
-`@yandex.com` 地址和 Yandex Mail 应用密码。
+独立的 **Yandex 邮箱聚合收件箱** 在配置至少 32 字节的 `MAIL_CREDENTIALS_KEY` 并应用
+`0034_yandex_mail_imap.sql` 后自动可用，无需额外的 IMAP 环境开关。入口默认显示，管理员可从
+**系统设置 → 邮箱功能入口** 隐藏。首版仅接受个人 `@yandex.com` 地址和 Yandex Mail 应用密码。
+
+NAVER、Yandex 的旧 IMAP 环境开关已移除，旧部署中残留的值不再生效。系统设置只控制入口显示，
+隐藏入口不删除账号、密文或索引，也不停止已有账号的后台同步；已保存的隐藏设置在升级后继续保留。
 
 ### 统一邮箱加密密钥与兼容迁移
 
