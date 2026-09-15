@@ -88,21 +88,32 @@ export async function resolveDeploymentTarget(values, { read = readDeploymentCon
   if (settings !== null) {
     if (!Array.isArray(settings?.bindings)) throw new Error('线上 Worker 绑定响应无效，已停止部署。')
     const existing = settings.bindings.filter((binding) => binding.name === 'DB')
-    if (existing.length !== 1 || existing[0].type !== 'd1' || typeof existing[0].id !== 'string' || !DATABASE_ID.test(existing[0].id)) {
+    if (existing.length > 1 || (existing.length === 1
+      && (existing[0].type !== 'd1' || typeof existing[0].id !== 'string' || !DATABASE_ID.test(existing[0].id)))) {
       throw new Error('已有 Worker 缺少有效的 DB 绑定，请在 Cloudflare 核对绑定，不能自动创建替代数据库。')
     }
-    databaseId = existing[0].id
-    if (configured.database_id && configured.database_id !== databaseId) {
+    databaseId = existing[0]?.id
+    if (databaseId && configured.database_id && configured.database_id !== databaseId) {
       throw new Error('配置中的 database_id 与线上 DB 绑定不一致，已停止以避免迁移或切换错库。')
     }
-  } else if (configured.database_id || configured.database_name) {
+  }
+  if (!databaseId && (configured.database_id || configured.database_name)) {
     const identifier = configured.database_id || configured.database_name
     if (typeof identifier !== 'string' || !identifier || identifier.length > 255 || /[\0\r\n]/.test(identifier)
       || (configured.database_id && !DATABASE_ID.test(identifier))) throw new Error('D1 数据库配置无效。')
     const database = await get(`/accounts/${accountId}/d1/database/${encodeURIComponent(identifier)}`)
     databaseId = database?.uuid
     if (typeof databaseId !== 'string' || !DATABASE_ID.test(databaseId)) throw new Error('指定的 D1 数据库不存在或返回的 ID 无效。')
-  } else {
+    if (configured.database_id && configured.database_id !== databaseId) throw new Error('查询返回的 D1 ID 与配置不一致，已停止部署。')
+  } else if (!databaseId && settings !== null) {
+    // Workers Builds 可先创建 Worker 和 Secret，再首次发布。仅在账号没有任何 D1 时自动建库，
+    // 避免把旧 Worker 丢失 DB 绑定误当成新部署，尤其是旧数据库使用其他名称的情况。
+    const databases = await get(`/accounts/${accountId}/d1/database?per_page=10`)
+    if (!Array.isArray(databases)) throw new Error('D1 数据库列表响应无效，无法确认首次部署。')
+    if (databases.length) {
+      throw new Error('已有 Worker 缺少有效的 DB 绑定，且账号中已有 D1 数据库。请恢复 DB 绑定，或在 wrangler.jsonc 中显式填写确认过的 database_id 后重试；不会自动创建替代数据库。')
+    }
+  } else if (!databaseId) {
     const existing = await get(`/accounts/${accountId}/d1/database/${DEFAULT_DATABASE_NAME}`)
     if (existing !== null) {
       throw new Error(`首次部署目标尚未创建，但账户中已存在 ${DEFAULT_DATABASE_NAME}。请核对目标 Worker，或显式填写确认过的 database_id，不能自动复用同名数据库。`)

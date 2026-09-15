@@ -44,11 +44,53 @@ describe('部署数据库目标解析', () => {
     })).rejects.toThrow('database_id 与线上 DB 绑定不一致')
   })
 
-  it.each([{}, { bindings: [] }, { bindings: [{ name: 'DB', type: 'kv_namespace', id: boundId }] }, { bindings: [{ name: 'DB', type: 'd1', id: 'invalid' }] }])(
+  it.each([{}, { bindings: [{ name: 'DB', type: 'kv_namespace', id: boundId }] }, { bindings: [{ name: 'DB', type: 'd1', id: 'invalid' }] },
+    { bindings: [...settings.bindings, ...settings.bindings] }])(
     '已有 Worker 绑定无效不能当成首次部署：%j', async (remote) => {
       await expect(resolveDeploymentTarget({}, { environment, read: async () => config(), get: async () => remote })).rejects.toThrow()
     },
   )
+
+  it.each([{ bindings: [] }, { bindings: [{ name: 'SETUP_TOKEN', type: 'secret_text' }, { name: 'SUPER_ADMIN_EMAIL', type: 'plain_text' }] }])(
+    '新账号中预创建的 Worker 可以自动创建 DB，兼容已配置变量：%j', async ({ bindings }) => {
+      const get = vi.fn().mockResolvedValueOnce({ bindings }).mockResolvedValueOnce([])
+      const target = await resolveDeploymentTarget({}, { environment, read: async () => config(), get })
+      expect(target).toMatchObject({ workerExists: true, databaseId: undefined })
+      expect(get).toHaveBeenLastCalledWith(`/accounts/${accountId}/d1/database?per_page=10`)
+    },
+  )
+
+  it.each(['omni-mail-db', 'omnimail-db', 'other-project-db'])(
+    'Worker 缺少 DB 而账号已有 %s 时不擅自创建或复用', async (name) => {
+      const get = vi.fn().mockResolvedValueOnce({ bindings: [] }).mockResolvedValueOnce([{ name, uuid: boundId }])
+      await expect(resolveDeploymentTarget({}, { environment, read: async () => config(), get }))
+        .rejects.toThrow('请恢复 DB 绑定')
+    },
+  )
+
+  it.each([null, {}, { result: [] }])('数据库列表无效时不能当作空账号：%j', async (databases) => {
+    const get = vi.fn().mockResolvedValueOnce({ bindings: [] }).mockResolvedValueOnce(databases)
+    await expect(resolveDeploymentTarget({}, { environment, read: async () => config(), get }))
+      .rejects.toThrow('列表响应无效')
+  })
+
+  it('列举 D1 权限失败时保留错误，不能当作空账号', async () => {
+    const get = vi.fn().mockResolvedValueOnce({ bindings: [] }).mockRejectedValueOnce(new Error('HTTP 403'))
+    await expect(resolveDeploymentTarget({}, { environment, read: async () => config(), get })).rejects.toThrow('HTTP 403')
+  })
+
+  it('Worker 尚未绑定 DB 时允许显式指定并校验已有数据库', async () => {
+    const get = vi.fn().mockResolvedValueOnce({ bindings: [] }).mockResolvedValueOnce({ uuid: boundId })
+    const target = await resolveDeploymentTarget({}, { environment, read: async () => config({ binding: 'DB', database_id: boundId }), get })
+    expect(target).toMatchObject({ workerExists: true, databaseId: boundId })
+    expect(get).toHaveBeenLastCalledWith(`/accounts/${accountId}/d1/database/${boundId}`)
+  })
+
+  it('显式配置数据库 ID 时拒绝查询响应返回其他数据库', async () => {
+    const get = vi.fn().mockResolvedValueOnce({ bindings: [] }).mockResolvedValueOnce({ uuid: wrongId })
+    await expect(resolveDeploymentTarget({}, { environment, read: async () => config({ binding: 'DB', database_id: boundId }), get }))
+      .rejects.toThrow('ID 与配置不一致')
+  })
 
   it('Worker 确认不存在且未指定数据库，才返回首次创建状态', async () => {
     expect(await resolveDeploymentTarget({}, { environment, read: async () => config(), get: async () => null }))
