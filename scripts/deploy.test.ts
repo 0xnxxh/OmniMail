@@ -44,7 +44,7 @@ describe('部署入口', () => {
   it('资源已创建但绑定传播延迟时只重查绑定，不重复发布或创建数据库', async () => {
     const deps = dependencies()
     deps.resolveTarget.mockResolvedValueOnce({ ...target, databaseId: undefined })
-      .mockRejectedValueOnce(new Error('已有 Worker 缺少有效的 DB 绑定，且账号中已有 D1 数据库。'))
+      .mockRejectedValueOnce(new Error('已有 Worker 缺少有效的 DB 绑定，但账户中已存在 omni-mail-db。'))
       .mockResolvedValue(target)
     const run = vi.fn(), migrate = vi.fn()
     await deploy([], { ...deps, run, migrate })

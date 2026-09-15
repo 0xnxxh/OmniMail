@@ -74,9 +74,12 @@ function fixture(options: {
 }
 
 describe('部署 D1 迁移', () => {
-  it('Cloudflare 预创建 Worker 后完整部署自动建表，重跑沿用绑定并保留数据', async () => {
+  it.each([false, true])('预创建 Worker 后完整部署自动建表，保留原库与其他服务数据（其他 D1：%s）', async (hasOtherDatabase) => {
     const f = fixture()
     const accountId = 'a'.repeat(32), databaseId = '11111111-1111-4111-8111-111111111111'
+    const other = fixture(), otherId = '22222222-2222-4222-8222-222222222222'
+    other.db.exec("CREATE TABLE service_nodes (id TEXT); INSERT INTO service_nodes VALUES ('keep')")
+    const otherDatabases = hasOtherDatabase ? [{ name: 'ggesim-frontend-nodes', uuid: otherId }] : []
     const directory = mkdtempSync(join(tmpdir(), 'omnimail-first-deploy-test-'))
     const rawConfig = { name: 'omni-mail', account_id: accountId, d1_databases: [{ binding: 'DB' }] }
     const loaded = { rawConfig, config: rawConfig, configPath: join(directory, 'wrangler.jsonc') }
@@ -84,7 +87,11 @@ describe('部署 D1 迁移', () => {
     const events: string[] = []
     const get = async (path: string) => {
       if (path.endsWith('/settings')) return { bindings: provisioned ? [{ name: 'DB', type: 'd1', id: databaseId }] : [] }
-      if (path.endsWith('/d1/database?per_page=10')) return []
+      const url = new URL(path, 'https://api.example')
+      if (url.pathname.endsWith('/d1/database')) {
+        const name = url.searchParams.get('name')
+        return otherDatabases.filter((database) => !name || database.name.includes(name))
+      }
       throw new Error(`未预期的 API 查询：${path}`)
     }
     const run = async (args: string[]) => {
@@ -121,6 +128,9 @@ describe('部署 D1 迁移', () => {
       expect(events).toEqual(['d1', 'deploy'])
       expect(f.imports()).toBe(1)
       expect(f.db.prepare("SELECT value FROM settings WHERE key = 'deployment_test'").get()).toEqual({ value: 'preserved' })
+      expect(other.run).not.toHaveBeenCalled()
+      expect(other.db.prepare('SELECT id FROM service_nodes').all()).toEqual([{ id: 'keep' }])
+      expect(other.db.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all()).toEqual([{ name: 'service_nodes' }])
     } finally { rmdirSync(directory) }
   })
 
