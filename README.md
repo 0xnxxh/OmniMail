@@ -51,7 +51,7 @@
 
 | 产品层 | 当前版本 | 支持层级 | 职责与兼容关系 |
 | --- | --- | --- | --- |
-| Web + Worker API | [`1.1.0`](https://github.com/mibgb65-cloud/OmniMail/releases/tag/v1.1.0) | 稳定兼容基线 | 核心服务、Webmail、数据和所有邮箱来源；自托管实例的唯一服务端 |
+| Web + Worker API | [`1.1.1`](https://github.com/mibgb65-cloud/OmniMail/releases/tag/v1.1.1) | 稳定兼容基线 | 核心服务、Webmail、数据和所有邮箱来源；自托管实例的唯一服务端 |
 | OmniMail Float | [`1.0.0`](https://github.com/mibgb65-cloud/OmniMail/releases/tag/float-v1.0.0) | 稳定兼容基线 | Chrome Manifest V3 浏览器协作层；连接 Web/API `1.x`，不直连第三方邮箱 |
 | Android | [`0.3.0`](https://github.com/mibgb65-cloud/OmniMail/releases/tag/android-v0.3.0) | 独立预览版 | 原生移动客户端；仍处于 `0.x`，兼容承诺和发布节奏独立于 Web/Float |
 
@@ -67,6 +67,8 @@
 
 ### 1.x 兼容边界
 
+- Web `1.1.0 → 1.1.1` 修复首次部署与 D1 定位，不新增数据库迁移、变量、Secret 或 API 变更。
+  更新代码后使用 `npm run deploy`；详见 [Web 1.1.1 发布说明](docs/releases/web/v1.1.1.md)。
 - Web `1.0.2 → 1.1.0` 需要应用 `0036`、`0037` 数据库迁移，使用 `npm run deploy` 自动处理。
   全局密钥为可选配置，旧独立密钥继续兼容；启用全局密钥后须保留旧密钥直到历史凭据迁移完成。
   完整升级步骤与回滚限制见 [Web 1.1.0 发布说明](docs/releases/web/v1.1.0.md)。
