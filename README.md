@@ -52,7 +52,7 @@
 | 产品层 | 当前版本 | 支持层级 | 职责与兼容关系 |
 | --- | --- | --- | --- |
 | Web + Worker API | [`1.1.3`](https://github.com/mibgb65-cloud/OmniMail/releases/tag/v1.1.3) | 稳定兼容基线 | 核心服务、Webmail、数据和所有邮箱来源；自托管实例的唯一服务端 |
-| OmniMail Float | [`1.0.0`](https://github.com/mibgb65-cloud/OmniMail/releases/tag/float-v1.0.0) | 稳定兼容基线 | Chrome Manifest V3 浏览器协作层；连接 Web/API `1.x`，不直连第三方邮箱 |
+| OmniMail Float | [`1.0.1`](https://github.com/mibgb65-cloud/OmniMail/releases/tag/float-v1.0.1) | 稳定兼容基线 | Chrome Manifest V3 浏览器协作层；连接 Web/API `1.x`，不直连第三方邮箱 |
 | Android | [`0.3.0`](https://github.com/mibgb65-cloud/OmniMail/releases/tag/android-v0.3.0) | 独立预览版 | 原生移动客户端；仍处于 `0.x`，兼容承诺和发布节奏独立于 Web/Float |
 
 ### 支持层级
@@ -790,7 +790,7 @@ OmniMail 的各客户端连接同一套 Worker JSON API，但按产品层使用�
 
 ## 浏览器悬浮扩展
 
-仓库内置 OmniMail Float `1.0.0` Chrome Manifest V3 扩展，可在普通网页显示隔离的
+仓库内置 OmniMail Float `1.0.1` Chrome Manifest V3 扩展，可在普通网页显示隔离的
 悬浮面板，
 支持跳转 OmniMail 网站授权、生成普通邮箱或 iCloud 隐藏地址、复制或填入当前网页，
 查看 OmniMail、iCloud、Linux DO、Gmail、Microsoft、QQ、NAVER 与 Yandex 邮箱的来信，
@@ -798,7 +798,7 @@ OmniMail 的各客户端连接同一套 Worker JSON API，但按产品层使用�
 扩展通过 PKCE 一次性授权码获得可随时撤销的设备令牌。
 
 - [Chrome Web Store 安装](https://chromewebstore.google.com/detail/omnimail-float/fpeecjailboemocpmpcbjaghpkpcaihf)
-- [Float `1.0.0` Release 与开发者模式 ZIP](https://github.com/mibgb65-cloud/OmniMail/releases/tag/float-v1.0.0)
+- [Float `1.0.1` Release 与开发者模式 ZIP](https://github.com/mibgb65-cloud/OmniMail/releases/tag/float-v1.0.1)
 
 Chrome Web Store 需要经过 Google 审核，因此商店显示版本可能暂时落后于 GitHub Release；
 两种渠道应使用相同版本的发布构建，不要把仓库源码压缩包当作扩展安装包。
