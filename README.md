@@ -51,7 +51,7 @@
 
 | 产品层 | 当前版本 | 支持层级 | 职责与兼容关系 |
 | --- | --- | --- | --- |
-| Web + Worker API | [`1.1.2`](https://github.com/mibgb65-cloud/OmniMail/releases/tag/v1.1.2) | 稳定兼容基线 | 核心服务、Webmail、数据和所有邮箱来源；自托管实例的唯一服务端 |
+| Web + Worker API | [`1.1.3`](https://github.com/mibgb65-cloud/OmniMail/releases/tag/v1.1.3) | 稳定兼容基线 | 核心服务、Webmail、数据和所有邮箱来源；自托管实例的唯一服务端 |
 | OmniMail Float | [`1.0.0`](https://github.com/mibgb65-cloud/OmniMail/releases/tag/float-v1.0.0) | 稳定兼容基线 | Chrome Manifest V3 浏览器协作层；连接 Web/API `1.x`，不直连第三方邮箱 |
 | Android | [`0.3.0`](https://github.com/mibgb65-cloud/OmniMail/releases/tag/android-v0.3.0) | 独立预览版 | 原生移动客户端；仍处于 `0.x`，兼容承诺和发布节奏独立于 Web/Float |
 
@@ -67,6 +67,9 @@
 
 ### 1.x 兼容边界
 
+- Web `1.1.2 → 1.1.3` 修复添加 Gmail 账号时无法直接粘贴带空格分组应用密码的问题，不新增数据库迁移或 API 变更。
+  应用密码校验改为按 Unicode 空格分隔符与零宽字符统一剥离；已连接账号无需重新验证。
+  升级步骤见 [Web 1.1.3 发布说明](docs/releases/web/v1.1.3.md)。
 - Web `1.1.1 → 1.1.2` 修复 NAVER、Yandex 的默认启用和入口显示，不新增数据库迁移或 API 变更。
   两个旧 IMAP 环境开关已移除；有效密钥即可启用，系统设置仅控制入口显示，已有隐藏设置继续保留。
   升级步骤及旧开关行为变化见 [Web 1.1.2 发布说明](docs/releases/web/v1.1.2.md)。
