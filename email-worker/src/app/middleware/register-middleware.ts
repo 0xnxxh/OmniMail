@@ -10,7 +10,6 @@ import { deviceScopesAllow } from '../../features/auth/tokens/token-scope'
 import { officialExtensionEnabled } from '../../features/admin/settings/system-settings'
 import { ensureSchema } from '../../platform/d1/schema'
 import { isAllowedOrigin, isOfficialChromeExtensionOrigin } from './origin-policy'
-import { matchesWebhookSecret } from '../../features/telegram/telegram-common'
 
 const PUBLIC_PATHS = new Set([
   '/api/health',
@@ -27,7 +26,6 @@ const PUBLIC_PATHS = new Set([
   '/api/auth/linux-do',
   '/api/auth/linux-do/callback',
   '/api/webhooks/resend',
-  '/api/webhooks/telegram',
 ])
 
 export function registerMiddleware(app: Hono<AppContext>): void {
@@ -69,15 +67,6 @@ app.use('*', async (context, next) => {
 
 app.use('/api/*', async (context, next) => {
   if (context.req.path === '/api/health') {
-    await next()
-    return
-  }
-  if (context.req.path === '/api/webhooks/telegram') {
-    if (!context.env.TELEGRAM_WEBHOOK_SECRET || !await matchesWebhookSecret(
-      context.env.TELEGRAM_WEBHOOK_SECRET,
-      context.req.header('X-Telegram-Bot-Api-Secret-Token') || '',
-    )) return context.json({ ok: false }, 403)
-    await ensureSchema(context.env.DB)
     await next()
     return
   }
